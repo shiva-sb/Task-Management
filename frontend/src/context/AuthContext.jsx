@@ -79,18 +79,14 @@ export const AuthProvider = ({ children }) => {
   }
 
   const logout = async () => {
-    try {
-      await api.post('/api/auth/logout')
-    } catch (error) {
-      console.error('Logout error:', error)
-    } finally {
-      localStorage.removeItem('token')
-      setToken(null)
-      setUser(null)
-      delete api.defaults.headers.common['Authorization']
-      navigate('/login')
-    }
-  }
+  // No API call (JWT logout is client-side)
+  localStorage.removeItem('token')
+  setToken(null)
+  setUser(null)
+  delete api.defaults.headers.common['Authorization']
+  navigate('/login')
+}
+
 
   const updateUser = (userData) => {
     setUser(userData)
