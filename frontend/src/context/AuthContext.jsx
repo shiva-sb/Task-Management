@@ -39,15 +39,8 @@ export const AuthProvider = ({ children }) => {
       const res = await api.get('/api/auth/me')
       setUser(res.data.user)
     } catch (error) {
-      console.error('Failed to fetch user:', error)
-
-      // only logout if token really invalid
-      if (error?.response?.status === 401) {
-        localStorage.removeItem('token')
-        setToken(null)
-        setUser(null)
-      }
-    } finally {
+  console.error('Failed to fetch user:', error)
+} finally {
       setLoading(false)
     }
   }

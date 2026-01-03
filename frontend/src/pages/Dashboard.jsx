@@ -27,11 +27,20 @@ import {
   CheckCircle
 } from "@mui/icons-material";
 
-// ---------- CHART.JS IMPORTS ----------
 import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
-
 ChartJS.register(ArcElement, Tooltip, Legend);
+
+// ---------- AUTHENTICATED API INSTANCE ----------
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL
+});
+
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem("token");
+  if (token) config.headers.Authorization = `Bearer ${token}`;
+  return config;
+});
 
 const Dashboard = () => {
   const { user, logout } = useAuth();
@@ -40,7 +49,6 @@ const Dashboard = () => {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("Todo");
 
-  // stats data
   const [stats, setStats] = useState({
     total: 0,
     todo: 0,
@@ -48,15 +56,16 @@ const Dashboard = () => {
     completed: 0
   });
 
-  // ------- LOAD DATA -------
+  // ---------- LOAD DATA ONCE ----------
   useEffect(() => {
     fetchTasks();
     fetchStats();
   }, []);
 
+  // ---------- API CALLS ----------
   const fetchTasks = async () => {
     try {
-      const res = await axios.get("/api/tasks");
+      const res = await api.get("/api/tasks");
       setTasks(res.data);
     } catch (err) {
       console.error("Failed to load tasks", err);
@@ -65,21 +74,20 @@ const Dashboard = () => {
 
   const fetchStats = async () => {
     try {
-      const res = await axios.get("/api/tasks/stats");
+      const res = await api.get("/api/tasks/stats");
       setStats(res.data);
     } catch (err) {
       console.error("Failed to load stats", err);
     }
   };
 
-  // ------- CRUD -------
   const createTask = async (e) => {
     e.preventDefault();
     if (!title.trim()) return;
 
     try {
-      const res = await axios.post("/api/tasks", { title, status });
-      setTasks(prev => [...prev, res.data]);
+      const res = await api.post("/api/tasks", { title, status });
+      setTasks((prev) => [...prev, res.data]);
       setTitle("");
       setStatus("Todo");
       fetchStats();
@@ -92,8 +100,8 @@ const Dashboard = () => {
     if (!window.confirm("Delete this task?")) return;
 
     try {
-      await axios.delete(`/api/tasks/${id}`);
-      setTasks(prev => prev.filter(t => t.id !== id));
+      await api.delete(`/api/tasks/${id}`);
+      setTasks((prev) => prev.filter((t) => t.id !== id));
       fetchStats();
     } catch (err) {
       console.error("Delete failed:", err);
@@ -102,22 +110,22 @@ const Dashboard = () => {
 
   const updateTaskStatus = async (id, newStatus) => {
     try {
-      const res = await axios.put(`/api/tasks/${id}`, { status: newStatus });
-      setTasks(prev => prev.map(t => (t.id === id ? res.data : t)));
+      const res = await api.put(`/api/tasks/${id}`, { status: newStatus });
+      setTasks((prev) => prev.map((t) => (t.id === id ? res.data : t)));
       fetchStats();
     } catch (err) {
       console.error("Update failed:", err);
     }
   };
 
-  // ------- ICONS -------
+  // ---------- STATUS ICON ----------
   const getStatusIcon = (s) => {
     if (s === "Completed") return <CheckCircle color="success" />;
     if (s === "In Progress") return <PlayArrow color="primary" />;
     return <Pending color="action" />;
   };
 
-  // ------- CHART DATA -------
+  // ---------- CHART DATA ----------
   const chartData = {
     labels: ["Todo", "In Progress", "Completed"],
     datasets: [
@@ -131,11 +139,7 @@ const Dashboard = () => {
   };
 
   const chartOptions = {
-    plugins: {
-      legend: {
-        position: "bottom"
-      }
-    },
+    plugins: { legend: { position: "bottom" } },
     cutout: "70%"
   };
 
@@ -145,7 +149,7 @@ const Dashboard = () => {
 
       <Container maxWidth="lg" sx={{ mt: 3 }}>
 
-        {/* HEADER AND LOGOUT */}
+        {/* ---------- HEADER ---------- */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h5">
             👋 Welcome, {user?.username || user?.email}
@@ -166,7 +170,7 @@ const Dashboard = () => {
           </Button>
         </Paper>
 
-        {/* -------- CHART SECTION -------- */}
+        {/* ---------- CHART ---------- */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6">Task Statistics</Typography>
 
@@ -175,7 +179,7 @@ const Dashboard = () => {
           </Box>
         </Paper>
 
-        {/* -------- ADD TASK -------- */}
+        {/* ---------- ADD TASK ---------- */}
         <Paper sx={{ p: 3, mb: 3 }}>
           <Typography variant="h6">Add Task</Typography>
 
@@ -212,7 +216,7 @@ const Dashboard = () => {
           </form>
         </Paper>
 
-        {/* -------- TASK LIST -------- */}
+        {/* ---------- TASK LIST ---------- */}
         <Typography variant="h5" gutterBottom>
           Your Tasks
         </Typography>
@@ -266,7 +270,6 @@ const Dashboard = () => {
             </Grid>
           ))}
         </Grid>
-
       </Container>
     </>
   );
