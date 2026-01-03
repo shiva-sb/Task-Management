@@ -7,21 +7,25 @@ dotenv.config();
 const app = express();
 
 // Middleware
-app.use(
-  cors({
-    origin: [
-      'http://localhost:3000',
-      'http://localhost:5173',
-      'https://task-management-4-ohvm.onrender.com'   // <-- your frontend URL
-    ],
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  })
-);
+const allowedOrigins = [
+  'http://localhost:3000',
+  'http://localhost:5173',
+  'https://task-management-4-ohvm.onrender.com',  // frontend
+  'https://task-management-4-ohvm.vercel.app'     // (add if deployed on Vercel later)
+];
 
-// handle preflight
+app.use(cors({
+  origin: allowedOrigins,
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
+// Handle preflight requests
 app.options('*', cors());
+
+// Parse JSON bodies
+app.use(express.json());
 
 // Health check
 app.get('/health', (req, res) => {
