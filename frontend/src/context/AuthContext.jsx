@@ -6,9 +6,18 @@ const AuthContext = createContext({})
 
 export const useAuth = () => useContext(AuthContext)
 
-// 🔹 Create axios instance with backend base URL
+// axios instance
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL   // <-- IMPORTANT
+  baseURL: import.meta.env.VITE_API_URL
+})
+
+// add token to every request automatically
+api.interceptors.request.use((config) => {
+  const token = localStorage.getItem('token')
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
+  return config
 })
 
 export const AuthProvider = ({ children }) => {
@@ -19,7 +28,6 @@ export const AuthProvider = ({ children }) => {
 
   useEffect(() => {
     if (token) {
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
       fetchUser()
     } else {
       setLoading(false)
@@ -28,30 +36,30 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const response = await api.get('/api/auth/me')
-      setUser(response.data.user)
+      const res = await api.get('/api/auth/me')
+      setUser(res.data.user)
     } catch (error) {
-  console.error('Failed to fetch user:', error)
+      console.error('Failed to fetch user:', error)
 
-  // do NOT auto logout on reload / cold backend
-  // only logout if token is really invalid (401)
-  if (error?.response?.status === 401) {
-    localStorage.removeItem('token')
-    setToken(null)
-    setUser(null)
+      // only logout if token really invalid
+      if (error?.response?.status === 401) {
+        localStorage.removeItem('token')
+        setToken(null)
+        setUser(null)
+      }
+    } finally {
+      setLoading(false)
+    }
   }
-}
 
   const login = async (email, password) => {
     try {
-      const response = await api.post('/api/auth/login', { email, password })
-      const { token, user } = response.data
+      const res = await api.post('/api/auth/login', { email, password })
+      const { token, user } = res.data
 
       localStorage.setItem('token', token)
       setToken(token)
       setUser(user)
-
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
       return { success: true }
     } catch (error) {
@@ -64,14 +72,12 @@ export const AuthProvider = ({ children }) => {
 
   const register = async (username, email, password) => {
     try {
-      const response = await api.post('/api/auth/register', { username, email, password })
-      const { token, user } = response.data
+      const res = await api.post('/api/auth/register', { username, email, password })
+      const { token, user } = res.data
 
       localStorage.setItem('token', token)
       setToken(token)
       setUser(user)
-
-      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
 
       return { success: true }
     } catch (error) {
@@ -82,31 +88,25 @@ export const AuthProvider = ({ children }) => {
     }
   }
 
-  const logout = async () => {
-  // No API call (JWT logout is client-side)
-  localStorage.removeItem('token')
-  setToken(null)
-  setUser(null)
-  delete api.defaults.headers.common['Authorization']
-  navigate('/login')
-}
-
-
-  const updateUser = (userData) => {
-    setUser(userData)
+  const logout = () => {
+    localStorage.removeItem('token')
+    setToken(null)
+    setUser(null)
+    navigate('/login')
   }
 
   return (
-    <AuthContext.Provider value={{
-      user,
-      token,
-      loading,
-      login,
-      register,
-      logout,
-      updateUser,
-      isAuthenticated: !!token
-    }}>
+    <AuthContext.Provider
+      value={{
+        user,
+        token,
+        loading,
+        login,
+        register,
+        logout,
+        isAuthenticated: !!token,
+      }}
+    >
       {children}
     </AuthContext.Provider>
   )
