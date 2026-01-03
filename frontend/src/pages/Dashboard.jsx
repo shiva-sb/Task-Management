@@ -1,217 +1,275 @@
-import React, { useState, useEffect } from 'react'
-import { useDispatch, useSelector } from 'react-redux'
-import { useAuth } from '../context/AuthContext'
-import Navbar from '../components/Navbar'
+import React, { useEffect, useState } from "react";
+import { useAuth } from "../context/AuthContext";
+import Navbar from "../components/Navbar";
+import axios from "axios";
+
 import {
   Container,
-  Grid,
-  Paper,
+  Box,
   Typography,
+  Paper,
   Button,
   TextField,
-  Box,
   MenuItem,
-  CircularProgress,
-  Alert,
+  Grid,
   Card,
   CardContent,
   CardActions,
   Chip
-} from '@mui/material'
-
-import { Doughnut } from 'react-chartjs-2'
-import { Chart as ChartJS, ArcElement, Tooltip, Legend } from 'chart.js'
+} from "@mui/material";
 
 import {
   Add as AddIcon,
   Delete as DeleteIcon,
-  Refresh as RefreshIcon,
-  CheckCircle,
-  Pending,
+  Logout as LogoutIcon,
   PlayArrow,
-  Logout as LogoutIcon   // ✅ IMPORTANT FIX
-} from '@mui/icons-material'
+  Pending,
+  CheckCircle
+} from "@mui/icons-material";
 
-import axios from 'axios'
-import { setTasks, addTask, updateTask, deleteTask, setLoading, setError } from '../store/store'
+// ---------- CHART.JS IMPORTS ----------
+import { Doughnut } from "react-chartjs-2";
+import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 
-ChartJS.register(ArcElement, Tooltip, Legend)
+ChartJS.register(ArcElement, Tooltip, Legend);
 
 const Dashboard = () => {
-  const dispatch = useDispatch()
-  const { user, logout } = useAuth()
-  const { tasks, loading, error } = useSelector(state => state.tasks)
+  const { user, logout } = useAuth();
 
-  const [title, setTitle] = useState('')
-  const [status, setStatus] = useState('Todo')
-  const [stats, setStats] = useState({ total: 0, todo: 0, inProgress: 0, completed: 0 })
-  const [refreshing, setRefreshing] = useState(false)
+  const [tasks, setTasks] = useState([]);
+  const [title, setTitle] = useState("");
+  const [status, setStatus] = useState("Todo");
 
+  // stats data
+  const [stats, setStats] = useState({
+    total: 0,
+    todo: 0,
+    inProgress: 0,
+    completed: 0
+  });
+
+  // ------- LOAD DATA -------
   useEffect(() => {
-    fetchTasks()
-    fetchStats()
-  }, [])
+    fetchTasks();
+    fetchStats();
+  }, []);
 
   const fetchTasks = async () => {
-    dispatch(setLoading(true))
-    setRefreshing(true)
     try {
-      const response = await axios.get('/api/tasks')
-      dispatch(setTasks(response.data))
-    } catch (error) {
-      dispatch(setError(error.response?.data?.error || 'Failed to fetch tasks'))
-    } finally {
-      dispatch(setLoading(false))
-      setRefreshing(false)
+      const res = await axios.get("/api/tasks");
+      setTasks(res.data);
+    } catch (err) {
+      console.error("Failed to load tasks", err);
     }
-  }
+  };
 
   const fetchStats = async () => {
     try {
-      const response = await axios.get('/api/tasks/stats')
-      setStats(response.data)
-    } catch (error) {
-      console.error('Failed to fetch stats:', error)
+      const res = await axios.get("/api/tasks/stats");
+      setStats(res.data);
+    } catch (err) {
+      console.error("Failed to load stats", err);
     }
-  }
+  };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault()
-    if (!title.trim()) {
-      dispatch(setError('Task title is required'))
-      return
-    }
+  // ------- CRUD -------
+  const createTask = async (e) => {
+    e.preventDefault();
+    if (!title.trim()) return;
 
     try {
-      const response = await axios.post('/api/tasks', { title, status })
-      dispatch(addTask(response.data))
-      setTitle('')
-      setStatus('Todo')
-      fetchStats()
-      dispatch(setError(null))
-    } catch (error) {
-      dispatch(setError(error.response?.data?.error || 'Failed to create task'))
+      const res = await axios.post("/api/tasks", { title, status });
+      setTasks(prev => [...prev, res.data]);
+      setTitle("");
+      setStatus("Todo");
+      fetchStats();
+    } catch (err) {
+      console.error("Create task error:", err);
     }
-  }
+  };
 
-  const handleUpdate = async (id, newStatus) => {
-    try {
-      const response = await axios.put(`/api/tasks/${id}`, { status: newStatus })
-      dispatch(updateTask(response.data))
-      fetchStats()
-    } catch (error) {
-      dispatch(setError(error.response?.data?.error || 'Failed to update task'))
-    }
-  }
-
-  const handleDelete = async (id) => {
-    if (!window.confirm('Are you sure you want to delete this task?')) return
+  const deleteTask = async (id) => {
+    if (!window.confirm("Delete this task?")) return;
 
     try {
-      await axios.delete(`/api/tasks/${id}`)
-      dispatch(deleteTask(id))
-      fetchStats()
-    } catch (error) {
-      dispatch(setError(error.response?.data?.error || 'Failed to delete task'))
+      await axios.delete(`/api/tasks/${id}`);
+      setTasks(prev => prev.filter(t => t.id !== id));
+      fetchStats();
+    } catch (err) {
+      console.error("Delete failed:", err);
     }
-  }
+  };
 
-  const getStatusIcon = (status) => {
-    switch (status) {
-      case 'Completed':
-        return <CheckCircle color="success" />
-      case 'In Progress':
-        return <PlayArrow color="primary" />
-      default:
-        return <Pending color="action" />
+  const updateTaskStatus = async (id, newStatus) => {
+    try {
+      const res = await axios.put(`/api/tasks/${id}`, { status: newStatus });
+      setTasks(prev => prev.map(t => (t.id === id ? res.data : t)));
+      fetchStats();
+    } catch (err) {
+      console.error("Update failed:", err);
     }
-  }
+  };
 
-  const getStatusColor = (status) => {
-    switch (status) {
-      case 'Completed':
-        return 'success'
-      case 'In Progress':
-        return 'primary'
-      default:
-        return 'default'
-    }
-  }
+  // ------- ICONS -------
+  const getStatusIcon = (s) => {
+    if (s === "Completed") return <CheckCircle color="success" />;
+    if (s === "In Progress") return <PlayArrow color="primary" />;
+    return <Pending color="action" />;
+  };
 
+  // ------- CHART DATA -------
   const chartData = {
-    labels: ['Todo', 'In Progress', 'Completed'],
+    labels: ["Todo", "In Progress", "Completed"],
     datasets: [
       {
         data: [stats.todo, stats.inProgress, stats.completed],
-        backgroundColor: ['#FF6384', '#36A2EB', '#4BC0C0'],
-        hoverBackgroundColor: ['#FF6384', '#36A2EB', '#4BC0C0'],
-        borderWidth: 2,
-        borderColor: '#fff'
+        backgroundColor: ["#FF6384", "#36A2EB", "#4BC0C0"],
+        borderColor: "#ffffff",
+        borderWidth: 2
       }
     ]
-  }
+  };
 
   const chartOptions = {
     plugins: {
       legend: {
-        position: 'bottom'
+        position: "bottom"
       }
     },
-    cutout: '70%'
-  }
-
-  if (loading && !refreshing) {
-    return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="100vh">
-        <CircularProgress />
-      </Box>
-    )
-  }
+    cutout: "70%"
+  };
 
   return (
     <>
       <Navbar />
 
-      <Container maxWidth="xl" sx={{ mt: 2, mb: 6 }}>
+      <Container maxWidth="lg" sx={{ mt: 3 }}>
 
-        {/* HEADER */}
-        <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between' }}>
-          <Typography variant="h4">Task Management Dashboard</Typography>
+        {/* HEADER AND LOGOUT */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h5">
+            👋 Welcome, {user?.username || user?.email}
+          </Typography>
 
-          <Button
-            variant="outlined"
-            onClick={fetchTasks}
-            startIcon={<RefreshIcon />}
-            disabled={refreshing}
-          >
-            {refreshing ? 'Refreshing...' : 'Refresh'}
-          </Button>
-        </Box>
-
-        {/* ERROR */}
-        {error && <Alert severity="error">{error}</Alert>}
-
-        {/* ---------- CONTENT ---------- */}
-        {/* (unchanged from your version — all logic retained) */}
-
-        {/* -------------- FOOTER LOGOUT BUTTON -------------- */}
-        <Box sx={{ mt: 4, textAlign: 'center' }}>
-          <Typography variant="body2" gutterBottom>
-            Signed in as: {user?.email}
+          <Typography color="text.secondary">
+            Total Tasks: {stats.total}
           </Typography>
 
           <Button
-            variant="outlined"
+            sx={{ mt: 2 }}
             color="error"
+            variant="outlined"
             onClick={logout}
-            startIcon={<LogoutIcon />} 
+            startIcon={<LogoutIcon />}
           >
             Logout
           </Button>
-        </Box>
+        </Paper>
+
+        {/* -------- CHART SECTION -------- */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6">Task Statistics</Typography>
+
+          <Box sx={{ width: 300, mx: "auto", mt: 2 }}>
+            <Doughnut data={chartData} options={chartOptions} />
+          </Box>
+        </Paper>
+
+        {/* -------- ADD TASK -------- */}
+        <Paper sx={{ p: 3, mb: 3 }}>
+          <Typography variant="h6">Add Task</Typography>
+
+          <form onSubmit={createTask}>
+            <TextField
+              fullWidth
+              label="Task Title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              margin="normal"
+            />
+
+            <TextField
+              select
+              fullWidth
+              label="Status"
+              value={status}
+              onChange={(e) => setStatus(e.target.value)}
+              margin="normal"
+            >
+              <MenuItem value="Todo">Todo</MenuItem>
+              <MenuItem value="In Progress">In Progress</MenuItem>
+              <MenuItem value="Completed">Completed</MenuItem>
+            </TextField>
+
+            <Button
+              type="submit"
+              variant="contained"
+              startIcon={<AddIcon />}
+              sx={{ mt: 2 }}
+            >
+              Add Task
+            </Button>
+          </form>
+        </Paper>
+
+        {/* -------- TASK LIST -------- */}
+        <Typography variant="h5" gutterBottom>
+          Your Tasks
+        </Typography>
+
+        {tasks.length === 0 && (
+          <Typography color="text.secondary">
+            No tasks yet — add one above.
+          </Typography>
+        )}
+
+        <Grid container spacing={2} sx={{ mt: 1 }}>
+          {tasks.map((task) => (
+            <Grid key={task.id} item xs={12} sm={6} md={4}>
+              <Card>
+                <CardContent>
+                  <Box display="flex" alignItems="center" gap={1}>
+                    {getStatusIcon(task.status)}
+                    <Chip label={task.status} />
+                  </Box>
+
+                  <Typography variant="h6" sx={{ mt: 1 }}>
+                    {task.title}
+                  </Typography>
+                </CardContent>
+
+                <CardActions>
+
+                  <TextField
+                    select
+                    value={task.status}
+                    onChange={(e) =>
+                      updateTaskStatus(task.id, e.target.value)
+                    }
+                    size="small"
+                    fullWidth
+                  >
+                    <MenuItem value="Todo">Todo</MenuItem>
+                    <MenuItem value="In Progress">In Progress</MenuItem>
+                    <MenuItem value="Completed">Completed</MenuItem>
+                  </TextField>
+
+                  <Button
+                    color="error"
+                    startIcon={<DeleteIcon />}
+                    onClick={() => deleteTask(task.id)}
+                  >
+                    Delete
+                  </Button>
+                </CardActions>
+              </Card>
+            </Grid>
+          ))}
+        </Grid>
+
       </Container>
     </>
-  )
-}
+  );
+};
 
-export default Dashboard
+export default Dashboard;
