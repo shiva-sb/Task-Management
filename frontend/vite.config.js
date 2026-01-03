@@ -7,7 +7,7 @@ export default defineConfig({
     port: 3000,
     proxy: {
       '/api': {
-        target: 'http://localhost:5000',
+        target: 'https://task-management-1-6lz4.onrender.com',
         changeOrigin: true,
       }
     }
