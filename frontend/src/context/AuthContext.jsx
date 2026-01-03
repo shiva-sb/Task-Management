@@ -6,6 +6,11 @@ const AuthContext = createContext({})
 
 export const useAuth = () => useContext(AuthContext)
 
+// 🔹 Create axios instance with backend base URL
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL   // <-- IMPORTANT
+})
+
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null)
   const [token, setToken] = useState(localStorage.getItem('token'))
@@ -13,9 +18,8 @@ export const AuthProvider = ({ children }) => {
   const navigate = useNavigate()
 
   useEffect(() => {
-    // Set axios default header
     if (token) {
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
       fetchUser()
     } else {
       setLoading(false)
@@ -24,7 +28,7 @@ export const AuthProvider = ({ children }) => {
 
   const fetchUser = async () => {
     try {
-      const response = await axios.get('/api/auth/me')
+      const response = await api.get('/api/auth/me')
       setUser(response.data.user)
     } catch (error) {
       console.error('Failed to fetch user:', error)
@@ -36,50 +40,54 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (email, password) => {
     try {
-      // console.log(email);
-      
-      const response = await axios.post('/api/auth/login', { email, password })
+      const response = await api.post('/api/auth/login', { email, password })
       const { token, user } = response.data
+
       localStorage.setItem('token', token)
       setToken(token)
       setUser(user)
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
       return { success: true }
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Login failed' 
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Login failed'
       }
     }
   }
 
   const register = async (username, email, password) => {
     try {
-      const response = await axios.post('/api/auth/register', { username, email, password })
+      const response = await api.post('/api/auth/register', { username, email, password })
       const { token, user } = response.data
+
       localStorage.setItem('token', token)
       setToken(token)
       setUser(user)
-      axios.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
+      api.defaults.headers.common['Authorization'] = `Bearer ${token}`
+
       return { success: true }
     } catch (error) {
-      return { 
-        success: false, 
-        error: error.response?.data?.error || 'Registration failed' 
+      return {
+        success: false,
+        error: error.response?.data?.error || 'Registration failed'
       }
     }
   }
 
   const logout = async () => {
     try {
-      await axios.post('/api/auth/logout')
+      await api.post('/api/auth/logout')
     } catch (error) {
       console.error('Logout error:', error)
     } finally {
       localStorage.removeItem('token')
       setToken(null)
       setUser(null)
-      delete axios.defaults.headers.common['Authorization']
+      delete api.defaults.headers.common['Authorization']
       navigate('/login')
     }
   }
@@ -89,15 +97,15 @@ export const AuthProvider = ({ children }) => {
   }
 
   return (
-    <AuthContext.Provider value={{ 
-      user, 
-      token, 
+    <AuthContext.Provider value={{
+      user,
+      token,
       loading,
-      login, 
-      register, 
+      login,
+      register,
       logout,
       updateUser,
-      isAuthenticated: !!token 
+      isAuthenticated: !!token
     }}>
       {children}
     </AuthContext.Provider>
