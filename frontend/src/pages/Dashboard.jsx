@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useMemo, useCallback } from "react";
 import { useAuth } from "../context/AuthContext";
 import Navbar from "../components/Navbar";
 import axios from "axios";
@@ -32,6 +32,7 @@ import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 ChartJS.register(ArcElement, Tooltip, Legend);
 
+// ---------- API ----------
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL
 });
@@ -42,6 +43,55 @@ api.interceptors.request.use((config) => {
   return config;
 });
 
+// ---------- MEMOIZED TASK CARD ----------
+const TaskCard = React.memo(function TaskCard({ task, onStatusChange, onDelete, getStatusIcon }) {
+  return (
+    <Card sx={{ borderRadius: 3, boxShadow: "0 8px 22px rgba(0,0,0,0.25)" }}>
+      <CardContent>
+        <Box display="flex" alignItems="center" gap={1}>
+          {getStatusIcon(task.status)}
+          <Chip
+            label={task.status}
+            color={
+              task.status === "Completed"
+                ? "success"
+                : task.status === "In Progress"
+                ? "primary"
+                : "warning"
+            }
+          />
+        </Box>
+
+        <Typography variant="h6" sx={{ mt: 1 }}>
+          {task.title}
+        </Typography>
+      </CardContent>
+
+      <CardActions>
+        <TextField
+          select
+          value={task.status}
+          onChange={(e) => onStatusChange(task.id, e.target.value)}
+          size="small"
+          fullWidth
+        >
+          <MenuItem value="Todo">Todo</MenuItem>
+          <MenuItem value="In Progress">In Progress</MenuItem>
+          <MenuItem value="Completed">Completed</MenuItem>
+        </TextField>
+
+        <Button
+          color="error"
+          startIcon={<DeleteIcon />}
+          onClick={() => onDelete(task.id)}
+        >
+          Delete
+        </Button>
+      </CardActions>
+    </Card>
+  );
+});
+
 const Dashboard = () => {
   const { user, logout } = useAuth();
 
@@ -49,99 +99,94 @@ const Dashboard = () => {
   const [title, setTitle] = useState("");
   const [status, setStatus] = useState("Todo");
 
-  const [stats, setStats] = useState({
-    total: 0,
-    todo: 0,
-    inProgress: 0,
-    completed: 0
-  });
-
+  // ---------- FETCH TASKS ONCE ----------
   useEffect(() => {
-    fetchTasks();
-    fetchStats();
+    api
+      .get("/api/tasks")
+      .then((res) => setTasks(res.data))
+      .catch(() => {});
   }, []);
 
-  const fetchTasks = async () => {
-    try {
-      const res = await api.get("/api/tasks");
-      setTasks(res.data);
-    } catch (err) {
-      console.error("Failed to load tasks", err);
-    }
-  };
+  // ---------- COMPUTE STATS LOCALLY (FAST) ----------
+  const stats = useMemo(() => {
+    const todo = tasks.filter((t) => t.status === "Todo").length;
+    const inProgress = tasks.filter((t) => t.status === "In Progress").length;
+    const completed = tasks.filter((t) => t.status === "Completed").length;
 
-  const fetchStats = async () => {
-    try {
-      const res = await api.get("/api/tasks/stats");
-      setStats(res.data);
-    } catch (err) {
-      console.error("Failed to load stats", err);
-    }
-  };
+    return {
+      total: tasks.length,
+      todo,
+      inProgress,
+      completed
+    };
+  }, [tasks]);
 
-  const createTask = async (e) => {
-    e.preventDefault();
-    if (!title.trim()) return;
+  // ---------- CHART DATA MEMO ----------
+  const chartData = useMemo(
+    () => ({
+      labels: ["Todo", "In Progress", "Completed"],
+      datasets: [
+        {
+          data: [stats.todo, stats.inProgress, stats.completed],
+          backgroundColor: ["#ff6b6b", "#4dabf7", "#51cf66"],
+          borderWidth: 2
+        }
+      ]
+    }),
+    [stats]
+  );
 
-    try {
-      const res = await api.post("/api/tasks", { title, status });
-      setTasks((prev) => [...prev, res.data]);
-      setTitle("");
-      setStatus("Todo");
-      fetchStats();
-    } catch (err) {
-      console.error("Create task error:", err);
-    }
-  };
+  const chartOptions = useMemo(
+    () => ({
+      plugins: { legend: { position: "bottom" } },
+      cutout: "70%"
+    }),
+    []
+  );
 
-  const deleteTask = async (id) => {
-    if (!window.confirm("Delete this task?")) return;
-
-    try {
-      await api.delete(`/api/tasks/${id}`);
-      setTasks((prev) => prev.filter((t) => t.id !== id));
-      fetchStats();
-    } catch (err) {
-      console.error("Delete failed:", err);
-    }
-  };
-
-  const updateTaskStatus = async (id, newStatus) => {
-    try {
-      const res = await api.put(`/api/tasks/${id}`, { status: newStatus });
-      setTasks((prev) => prev.map((t) => (t.id === id ? res.data : t)));
-      fetchStats();
-    } catch (err) {
-      console.error("Update failed:", err);
-    }
-  };
-
-  const getStatusIcon = (s) => {
+  // ---------- ICON MEMO ----------
+  const getStatusIcon = useCallback((s) => {
     if (s === "Completed") return <CheckCircle color="success" />;
     if (s === "In Progress") return <PlayArrow color="primary" />;
     return <Pending color="warning" />;
-  };
+  }, []);
 
-  const chartData = {
-    labels: ["Todo", "In Progress", "Completed"],
-    datasets: [
-      {
-        data: [stats.todo, stats.inProgress, stats.completed],
-        backgroundColor: ["#ff6b6b", "#4dabf7", "#51cf66"],
-        borderWidth: 2
-      }
-    ]
-  };
+  // ---------- ACTIONS ----------
+  const createTask = useCallback(
+    async (e) => {
+      e.preventDefault();
+      if (!title.trim()) return;
 
-  const chartOptions = {
-    plugins: { legend: { position: "bottom" } },
-    cutout: "70%"
-  };
+      const res = await api.post("/api/tasks", { title, status });
+
+      // OPTIMISTIC NO-REFETCH
+      setTasks((prev) => [...prev, res.data]);
+
+      setTitle("");
+      setStatus("Todo");
+    },
+    [title, status]
+  );
+
+  const deleteTask = useCallback(async (id) => {
+    await api.delete(`/api/tasks/${id}`);
+
+    // OPTIMISTIC DELETE
+    setTasks((prev) => prev.filter((t) => t.id !== id));
+  }, []);
+
+  const updateTaskStatus = useCallback(async (id, newStatus) => {
+    const res = await api.put(`/api/tasks/${id}`, { status: newStatus });
+
+    // LOCAL PATCH UPDATE
+    setTasks((prev) => prev.map((t) => (t.id === id ? res.data : t)));
+  }, []);
 
   return (
     <>
       <Navbar />
 
+      {/* same styled layout retained */}
       <Box
         sx={{
           minHeight: "100vh",
@@ -151,7 +196,7 @@ const Dashboard = () => {
       >
         <Container maxWidth="lg">
           
-          {/* HEADER CARD */}
+          {/* HEADER */}
           <Paper
             sx={{
               p: 3,
@@ -160,11 +205,11 @@ const Dashboard = () => {
               backdropFilter: "blur(8px)",
               background: "rgba(255,255,255,0.1)",
               color: "white",
-              boxShadow: "0 8px 30px rgba(0,0,0,0.3)"
+              boxShadow: "0 8px 30px rgba(0,0,0,0.3)",
             }}
           >
             <Typography variant="h5" fontWeight="bold">
-              Welcome, {user?.username || user?.email}
+              👋 Welcome, {user?.username || user?.email}
             </Typography>
 
             <Typography sx={{ opacity: 0.9 }}>
@@ -182,8 +227,7 @@ const Dashboard = () => {
           </Paper>
 
           <Grid container spacing={3}>
-            
-            {/* CHART CARD */}
+            {/* CHART */}
             <Grid item xs={12} md={5}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
                 <Typography variant="h6" gutterBottom>
@@ -199,7 +243,7 @@ const Dashboard = () => {
             {/* ADD TASK */}
             <Grid item xs={12} md={7}>
               <Paper sx={{ p: 3, borderRadius: 3 }}>
-                <Typography variant="h6">Add New Task</Typography>
+                <Typography variant="h6">➕ Add New Task</Typography>
 
                 <form onSubmit={createTask}>
                   <TextField
@@ -245,62 +289,18 @@ const Dashboard = () => {
             color="white"
             fontWeight="bold"
           >
-             Your Tasks
+            📝 Your Tasks
           </Typography>
 
           <Grid container spacing={2}>
             {tasks.map((task) => (
               <Grid key={task.id} item xs={12} sm={6} md={4}>
-                <Card
-                  sx={{
-                    borderRadius: 3,
-                    boxShadow: "0 8px 22px rgba(0,0,0,0.25)",
-                  }}
-                >
-                  <CardContent>
-                    <Box display="flex" alignItems="center" gap={1}>
-                      {getStatusIcon(task.status)}
-                      <Chip
-                        label={task.status}
-                        color={
-                          task.status === "Completed"
-                            ? "success"
-                            : task.status === "In Progress"
-                            ? "primary"
-                            : "warning"
-                        }
-                      />
-                    </Box>
-
-                    <Typography variant="h6" sx={{ mt: 1 }}>
-                      {task.title}
-                    </Typography>
-                  </CardContent>
-
-                  <CardActions>
-                    <TextField
-                      select
-                      value={task.status}
-                      onChange={(e) =>
-                        updateTaskStatus(task.id, e.target.value)
-                      }
-                      size="small"
-                      fullWidth
-                    >
-                      <MenuItem value="Todo">Todo</MenuItem>
-                      <MenuItem value="In Progress">In Progress</MenuItem>
-                      <MenuItem value="Completed">Completed</MenuItem>
-                    </TextField>
-
-                    <Button
-                      color="error"
-                      startIcon={<DeleteIcon />}
-                      onClick={() => deleteTask(task.id)}
-                    >
-                      Delete
-                    </Button>
-                  </CardActions>
-                </Card>
+                <TaskCard
+                  task={task}
+                  onStatusChange={updateTaskStatus}
+                  onDelete={deleteTask}
+                  getStatusIcon={getStatusIcon}
+                />
               </Grid>
             ))}
           </Grid>
