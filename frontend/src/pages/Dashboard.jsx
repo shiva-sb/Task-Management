@@ -15,7 +15,8 @@ import {
   Card,
   CardContent,
   CardActions,
-  Chip
+  Chip,
+  Divider
 } from "@mui/material";
 
 import {
@@ -31,7 +32,6 @@ import { Doughnut } from "react-chartjs-2";
 import { Chart as ChartJS, ArcElement, Tooltip, Legend } from "chart.js";
 ChartJS.register(ArcElement, Tooltip, Legend);
 
-// ---------- AUTHENTICATED API INSTANCE ----------
 const api = axios.create({
   baseURL: import.meta.env.VITE_API_URL
 });
@@ -56,13 +56,11 @@ const Dashboard = () => {
     completed: 0
   });
 
-  // ---------- LOAD DATA ONCE ----------
   useEffect(() => {
     fetchTasks();
     fetchStats();
   }, []);
 
-  // ---------- API CALLS ----------
   const fetchTasks = async () => {
     try {
       const res = await api.get("/api/tasks");
@@ -118,21 +116,18 @@ const Dashboard = () => {
     }
   };
 
-  // ---------- STATUS ICON ----------
   const getStatusIcon = (s) => {
     if (s === "Completed") return <CheckCircle color="success" />;
     if (s === "In Progress") return <PlayArrow color="primary" />;
-    return <Pending color="action" />;
+    return <Pending color="warning" />;
   };
 
-  // ---------- CHART DATA ----------
   const chartData = {
     labels: ["Todo", "In Progress", "Completed"],
     datasets: [
       {
         data: [stats.todo, stats.inProgress, stats.completed],
-        backgroundColor: ["#FF6384", "#36A2EB", "#4BC0C0"],
-        borderColor: "#ffffff",
+        backgroundColor: ["#ff6b6b", "#4dabf7", "#51cf66"],
         borderWidth: 2
       }
     ]
@@ -147,111 +142,81 @@ const Dashboard = () => {
     <>
       <Navbar />
 
-      <Container maxWidth="lg" sx={{ mt: 3 }}>
-
-        {/* ---------- HEADER ---------- */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h5">
-            👋 Welcome, {user?.username || user?.email}
-          </Typography>
-
-          <Typography color="text.secondary">
-            Total Tasks: {stats.total}
-          </Typography>
-
-          <Button
-            sx={{ mt: 2 }}
-            color="error"
-            variant="outlined"
-            onClick={logout}
-            startIcon={<LogoutIcon />}
+      <Box
+        sx={{
+          minHeight: "100vh",
+          py: 4,
+          background: "linear-gradient(135deg, #1e3c72 0%, #2a5298 100%)",
+        }}
+      >
+        <Container maxWidth="lg">
+          
+          {/* HEADER CARD */}
+          <Paper
+            sx={{
+              p: 3,
+              mb: 3,
+              borderRadius: 3,
+              backdropFilter: "blur(8px)",
+              background: "rgba(255,255,255,0.1)",
+              color: "white",
+              boxShadow: "0 8px 30px rgba(0,0,0,0.3)"
+            }}
           >
-            Logout
-          </Button>
-        </Paper>
+            <Typography variant="h5" fontWeight="bold">
+              Welcome, {user?.username || user?.email}
+            </Typography>
 
-        {/* ---------- CHART ---------- */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6">Task Statistics</Typography>
-
-          <Box sx={{ width: 300, mx: "auto", mt: 2 }}>
-            <Doughnut data={chartData} options={chartOptions} />
-          </Box>
-        </Paper>
-
-        {/* ---------- ADD TASK ---------- */}
-        <Paper sx={{ p: 3, mb: 3 }}>
-          <Typography variant="h6">Add Task</Typography>
-
-          <form onSubmit={createTask}>
-            <TextField
-              fullWidth
-              label="Task Title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              margin="normal"
-            />
-
-            <TextField
-              select
-              fullWidth
-              label="Status"
-              value={status}
-              onChange={(e) => setStatus(e.target.value)}
-              margin="normal"
-            >
-              <MenuItem value="Todo">Todo</MenuItem>
-              <MenuItem value="In Progress">In Progress</MenuItem>
-              <MenuItem value="Completed">Completed</MenuItem>
-            </TextField>
+            <Typography sx={{ opacity: 0.9 }}>
+              Total Tasks: {stats.total}
+            </Typography>
 
             <Button
-              type="submit"
-              variant="contained"
-              startIcon={<AddIcon />}
-              sx={{ mt: 2 }}
+              sx={{ mt: 2, borderColor: "white", color: "white" }}
+              variant="outlined"
+              onClick={logout}
+              startIcon={<LogoutIcon />}
             >
-              Add Task
+              Logout
             </Button>
-          </form>
-        </Paper>
+          </Paper>
 
-        {/* ---------- TASK LIST ---------- */}
-        <Typography variant="h5" gutterBottom>
-          Your Tasks
-        </Typography>
+          <Grid container spacing={3}>
+            
+            {/* CHART CARD */}
+            <Grid item xs={12} md={5}>
+              <Paper sx={{ p: 3, borderRadius: 3 }}>
+                <Typography variant="h6" gutterBottom>
+                  📊 Task Statistics
+                </Typography>
+                <Divider />
+                <Box sx={{ width: 300, mx: "auto", mt: 2 }}>
+                  <Doughnut data={chartData} options={chartOptions} />
+                </Box>
+              </Paper>
+            </Grid>
 
-        {tasks.length === 0 && (
-          <Typography color="text.secondary">
-            No tasks yet — add one above.
-          </Typography>
-        )}
+            {/* ADD TASK */}
+            <Grid item xs={12} md={7}>
+              <Paper sx={{ p: 3, borderRadius: 3 }}>
+                <Typography variant="h6">Add New Task</Typography>
 
-        <Grid container spacing={2} sx={{ mt: 1 }}>
-          {tasks.map((task) => (
-            <Grid key={task.id} item xs={12} sm={6} md={4}>
-              <Card>
-                <CardContent>
-                  <Box display="flex" alignItems="center" gap={1}>
-                    {getStatusIcon(task.status)}
-                    <Chip label={task.status} />
-                  </Box>
-
-                  <Typography variant="h6" sx={{ mt: 1 }}>
-                    {task.title}
-                  </Typography>
-                </CardContent>
-
-                <CardActions>
+                <form onSubmit={createTask}>
+                  <TextField
+                    fullWidth
+                    label="Task Title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    margin="normal"
+                  />
 
                   <TextField
                     select
-                    value={task.status}
-                    onChange={(e) =>
-                      updateTaskStatus(task.id, e.target.value)
-                    }
-                    size="small"
                     fullWidth
+                    label="Status"
+                    value={status}
+                    onChange={(e) => setStatus(e.target.value)}
+                    margin="normal"
                   >
                     <MenuItem value="Todo">Todo</MenuItem>
                     <MenuItem value="In Progress">In Progress</MenuItem>
@@ -259,18 +224,88 @@ const Dashboard = () => {
                   </TextField>
 
                   <Button
-                    color="error"
-                    startIcon={<DeleteIcon />}
-                    onClick={() => deleteTask(task.id)}
+                    type="submit"
+                    variant="contained"
+                    fullWidth
+                    startIcon={<AddIcon />}
+                    sx={{ mt: 2, py: 1.2, fontWeight: "bold" }}
                   >
-                    Delete
+                    Add Task
                   </Button>
-                </CardActions>
-              </Card>
+                </form>
+              </Paper>
             </Grid>
-          ))}
-        </Grid>
-      </Container>
+          </Grid>
+
+          {/* TASK LIST */}
+          <Typography
+            variant="h5"
+            mt={4}
+            mb={1}
+            color="white"
+            fontWeight="bold"
+          >
+             Your Tasks
+          </Typography>
+
+          <Grid container spacing={2}>
+            {tasks.map((task) => (
+              <Grid key={task.id} item xs={12} sm={6} md={4}>
+                <Card
+                  sx={{
+                    borderRadius: 3,
+                    boxShadow: "0 8px 22px rgba(0,0,0,0.25)",
+                  }}
+                >
+                  <CardContent>
+                    <Box display="flex" alignItems="center" gap={1}>
+                      {getStatusIcon(task.status)}
+                      <Chip
+                        label={task.status}
+                        color={
+                          task.status === "Completed"
+                            ? "success"
+                            : task.status === "In Progress"
+                            ? "primary"
+                            : "warning"
+                        }
+                      />
+                    </Box>
+
+                    <Typography variant="h6" sx={{ mt: 1 }}>
+                      {task.title}
+                    </Typography>
+                  </CardContent>
+
+                  <CardActions>
+                    <TextField
+                      select
+                      value={task.status}
+                      onChange={(e) =>
+                        updateTaskStatus(task.id, e.target.value)
+                      }
+                      size="small"
+                      fullWidth
+                    >
+                      <MenuItem value="Todo">Todo</MenuItem>
+                      <MenuItem value="In Progress">In Progress</MenuItem>
+                      <MenuItem value="Completed">Completed</MenuItem>
+                    </TextField>
+
+                    <Button
+                      color="error"
+                      startIcon={<DeleteIcon />}
+                      onClick={() => deleteTask(task.id)}
+                    >
+                      Delete
+                    </Button>
+                  </CardActions>
+                </Card>
+              </Grid>
+            ))}
+          </Grid>
+        </Container>
+      </Box>
     </>
   );
 };
