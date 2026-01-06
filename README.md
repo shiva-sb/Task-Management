@@ -10,7 +10,7 @@ Frontend (Render):
 https://task-management-4-ohvm.onrender.com
 
 Backend API (Render):  
-https://****render.com.com
+https://****.render.com
 
 ---
 
